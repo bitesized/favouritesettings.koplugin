@@ -7,6 +7,8 @@ away instead of three levels down.
 
 The tab appears in the reader and in the file browser.
 
+![The star tab, holding five menu entries and three quick actions](screenshots/star-tab.png)
+
 ## Adding a favourite
 
 **★ → Add a favourite** walks the same menu you already know, with a checkbox
@@ -14,18 +16,31 @@ on every entry. Tick one and it appears in the tab; untick it and it is gone.
 Submenus can be starred too: open one and tick *Add "…" to favourites* at the
 top.
 
+![The Settings tab mirrored as checkboxes, with Frontlight ticked](screenshots/add-a-favourite.png)
+
 Hold-to-favourite would have been tidier, but most menu entries already use
 hold for something -- usually "set this as the default" -- so the browser stays
 out of their way.
 
 **★ → Manage favourites** holds the rest:
 
+![Manage favourites](screenshots/manage-favourites.png)
+
 * **Arrange favourites** -- reorder them.
 * **Remove favourites** -- ticked means kept; untick to remove. Tick again
   before leaving the submenu to change your mind.
 * **Quick actions** -- the actions the Gestures and Profiles plugins offer, for
   things that are not menu entries at all (toggle frontlight, show the
-  dictionary, and so on).
+  dictionary, and so on). Tick them by section; each one becomes its own entry
+  in the tab and runs on its own, so the options Gestures has for running a
+  *set* of actions together -- execution order, QuickMenu, and the rest -- are
+  left out.
+
+  ![Quick actions, listed by section](screenshots/quick-actions.png)
+
+  An action that does not apply where you are -- a fixed-layout action while
+  you are reading an epub, a reader action in the file browser -- is shown
+  greyed out rather than doing nothing when tapped.
 * **Show tab in reader / file browser** -- turn the tab off where you do not
   want it. The same menu stays reachable under *Tools → More tools → Favourite
   settings*, so there is always a way back.
@@ -67,8 +82,16 @@ directory.
 
 ## Installing
 
-Copy the directory into KOReader's `plugins/` folder, keeping the
-`.koplugin` suffix, and restart.
+Download the zip from the [latest
+release](https://github.com/bitesized/favouritesettings.koplugin/releases/latest)
+and unpack it into KOReader's `plugins/` folder, then restart KOReader.
+
+The directory **must** be named `favouritesettings.koplugin`: KOReader only
+looks at directories whose name ends in `.koplugin`, and silently ignores
+everything else. The release zip already has the name right. GitHub's own
+"Download ZIP" button does not -- it gives you
+`favouritesettings.koplugin-main`, which KOReader will not load until you
+rename it.
 
 ## How the tab gets there
 

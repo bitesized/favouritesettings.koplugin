@@ -28,6 +28,63 @@ local MENU_ORDERS = {
     filemanager = "ui/elements/filemanager_menu_order",
 }
 
+-- `Dispatcher:isActionEnabled` wants an action's definition, and the table
+-- those live in is a local of `dispatcher.lua`. Reading it back off an upvalue
+-- is the only way to it; if that ever stops working we just show every action,
+-- which is how the plugin behaved before.
+local settingsList = (function()
+    local ok, list = pcall(function()
+        local index = 1
+        while true do
+            local name, value = debug.getupvalue(Dispatcher.getActionArgs, index)
+            if not name then return nil end
+            if name == "settingsList" then return value end
+            index = index + 1
+        end
+    end)
+    return ok and list or nil
+end)()
+
+--- Is this quick action usable in the current context? Reader-only actions are
+-- not, in the file browser, and `Dispatcher:execute` skips them silently --
+-- which looks exactly like a broken favourite.
+local function isActionEnabled(key)
+    if not settingsList then return true end
+    return Dispatcher:isActionEnabled(settingsList[key])
+end
+
+--- Closes the top menu. Actions are delivered as events to whatever is on top
+-- of the widget stack, and until the menu is gone that is the menu itself, so
+-- an action fired from an open menu is simply swallowed. QuickMenu closes
+-- itself before executing for the same reason.
+local function closeTopMenu(ui, touchmenu_instance)
+    if touchmenu_instance then
+        touchmenu_instance:closeMenu()
+        return
+    end
+    -- Non-touch devices get a plain `Menu`, whose callbacks are called without
+    -- the menu instance.
+    local menu = ui.menu
+    local close = menu.onCloseReaderMenu or menu.onCloseFileManagerMenu
+    if close then close(menu) end
+end
+
+--- Drops the tail of Dispatcher's action submenu.
+-- Everything after the section list configures how a *set* of actions is run
+-- together: execution order, execute-one-by-one, and the whole QuickMenu
+-- block. Favourites are run one at a time straight from the tab, so none of it
+-- applies and all of it silently does nothing. Dispatcher sets `max_per_page`
+-- to the length of the menu immediately before appending those items, which is
+-- exactly the cut we want.
+local function trimExecutionOptions(menu)
+    local keep = menu.max_per_page
+    if not keep or keep >= #menu then return end
+    for i = #menu, keep + 1, -1 do
+        menu[i] = nil
+    end
+    menu.max_per_page = nil -- the page break it marked is gone with them
+end
+
 --- Adds or removes our tab in one context's menu order.
 -- The order tables are singletons, so this outlives the plugin instance that
 -- called it and takes effect the next time that menu is built.
@@ -81,12 +138,21 @@ function FavouriteSettings:init()
     self.context = self.ui.document and "reader" or "filemanager"
     setTabInOrder(self.context, self.store:isShownIn(self.context))
     -- Dispatcher's action picker reports changes by setting `updated` on the
-    -- caller it was given; catch that to persist and refresh.
-    self.dispatcher_caller = setmetatable({}, {
+    -- caller it was given; catch that to persist and refresh. `__newindex`
+    -- only fires while the key is absent, so `updated` is deliberately never
+    -- stored -- otherwise only the first edit of a session would reach us and
+    -- every later one would need a restart to show up.
+    self.dispatcher_caller = setmetatable({
+        -- Dispatcher offers "Use gesture distance" to callers it takes for the
+        -- Gestures plugin, i.e. those without a `profiles` field. There is no
+        -- gesture behind a favourite, so say we are not one.
+        profiles = false,
+    }, {
         __newindex = function(caller, key, value)
-            rawset(caller, key, value)
             if key == "updated" and value then
                 self:onActionsEdited()
+            else
+                rawset(caller, key, value)
             end
         end,
     })
@@ -216,8 +282,12 @@ function FavouriteSettings:buildItem(favourite)
             text_func = function()
                 return Dispatcher:getNameFromItem(key, self.store.actions)
             end,
-            keep_menu_open = true,
-            callback = function()
+            enabled_func = function()
+                return isActionEnabled(key)
+            end,
+            keep_menu_open = true, -- we close it ourselves, first
+            callback = function(touchmenu_instance)
+                closeTopMenu(self.ui, touchmenu_instance)
                 Dispatcher:execute({ [key] = self.store.actions[key] })
             end,
         }
@@ -272,6 +342,7 @@ function FavouriteSettings:manageMenu()
             sub_item_table_func = function()
                 local actions = {}
                 Dispatcher:addSubMenu(self.dispatcher_caller, actions, self.store, "actions")
+                trimExecutionOptions(actions)
                 return actions
             end,
         },
